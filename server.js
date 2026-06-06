@@ -6,188 +6,142 @@ const db      = require('./db/database');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ─── Middleware ───────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── Auth simples por header ──────────────────────────────────
-// O painel envia: Authorization: Bearer <ADMIN_TOKEN>
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'mude-isso-aqui';
 
 function adminAuth(req, res, next) {
-  const auth = req.headers['authorization'] || '';
-  const token = auth.replace('Bearer ', '').trim();
+  const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
   if (token !== ADMIN_TOKEN) return res.status(401).json({ error: 'Não autorizado' });
   next();
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ROTAS ADMIN (painel)
-// ═══════════════════════════════════════════════════════════════
-
-// Listar keys pendentes
-app.get('/admin/keys', adminAuth, (req, res) => {
-  const keys = db.prepare('SELECT * FROM keys WHERE ativada = 0 ORDER BY criada_em DESC').all();
-  res.json(keys);
+// ── ADMIN: listar keys pendentes ──────────────────────────────
+app.get('/admin/keys', adminAuth, async (req, res) => {
+  const rows = await db.all2('SELECT * FROM keys WHERE ativada = 0 ORDER BY criada_em DESC', []);
+  res.json(rows);
 });
 
-// Gerar keys
-app.post('/admin/keys/gerar', adminAuth, (req, res) => {
+// ── ADMIN: gerar keys ─────────────────────────────────────────
+app.post('/admin/keys/gerar', adminAuth, async (req, res) => {
   const { tipo, prefixo = 'Key', quantidade = 1 } = req.body;
   const tipos = ['diario', 'semanal', 'mensal', 'vitalicio'];
   if (!tipos.includes(tipo)) return res.status(400).json({ error: 'Tipo inválido' });
-
-  const qtd   = Math.min(parseInt(quantidade) || 1, 100);
+  const qtd = Math.min(parseInt(quantidade) || 1, 100);
   const geradas = [];
-  const stmt  = db.prepare('INSERT INTO keys (key, tipo, criada_em) VALUES (?, ?, ?)');
-
   for (let i = 0; i < qtd; i++) {
-    const key = `${prefixo}-${randStr(5)}-${randStr(5)}-${randStr(5)}-${randStr(5)}`;
-    stmt.run(key, tipo, new Date().toISOString());
+    const key = `${prefixo}-${rand(5)}-${rand(5)}-${rand(5)}-${rand(5)}`;
+    await db.run2('INSERT INTO keys (key, tipo, criada_em) VALUES (?, ?, ?)', [key, tipo, new Date().toISOString()]);
     geradas.push(key);
   }
   res.json({ geradas });
 });
 
-// Deletar key pendente
-app.delete('/admin/keys/:key', adminAuth, (req, res) => {
-  db.prepare('DELETE FROM keys WHERE key = ? AND ativada = 0').run(req.params.key);
+// ── ADMIN: deletar key pendente ───────────────────────────────
+app.delete('/admin/keys/:key', adminAuth, async (req, res) => {
+  await db.run2('DELETE FROM keys WHERE key = ? AND ativada = 0', [req.params.key]);
   res.json({ ok: true });
 });
 
-// Limpar todas pendentes de um tipo
-app.delete('/admin/keys/tipo/:tipo', adminAuth, (req, res) => {
-  db.prepare('DELETE FROM keys WHERE tipo = ? AND ativada = 0').run(req.params.tipo);
+// ── ADMIN: limpar tipo ────────────────────────────────────────
+app.delete('/admin/keys/tipo/:tipo', adminAuth, async (req, res) => {
+  await db.run2('DELETE FROM keys WHERE tipo = ? AND ativada = 0', [req.params.tipo]);
   res.json({ ok: true });
 });
 
-// Listar ativadas
-app.get('/admin/ativadas', adminAuth, (req, res) => {
+// ── ADMIN: listar ativadas ────────────────────────────────────
+app.get('/admin/ativadas', adminAuth, async (req, res) => {
   const q = req.query.q ? `%${req.query.q}%` : '%';
-  const rows = db.prepare(`
-    SELECT * FROM ativadas
-    WHERE key LIKE ? OR hwid LIKE ? OR ip LIKE ?
-    ORDER BY ativada_em DESC
-  `).all(q, q, q);
+  const rows = await db.all2(
+    'SELECT * FROM ativadas WHERE key LIKE ? OR hwid LIKE ? OR ip LIKE ? ORDER BY ativada_em DESC',
+    [q, q, q]
+  );
   res.json(rows);
 });
 
-// Deletar ativada
-app.delete('/admin/ativadas/:key', adminAuth, (req, res) => {
-  db.prepare('DELETE FROM ativadas WHERE key = ?').run(req.params.key);
-  db.prepare("UPDATE keys SET ativada = 0 WHERE key = ?").run(req.params.key);
+// ── ADMIN: deletar ativada ────────────────────────────────────
+app.delete('/admin/ativadas/:key', adminAuth, async (req, res) => {
+  await db.run2('DELETE FROM ativadas WHERE key = ?', [req.params.key]);
+  await db.run2('UPDATE keys SET ativada = 0 WHERE key = ?', [req.params.key]);
   res.json({ ok: true });
 });
 
-// Resetar HWID
-app.post('/admin/hwid/reset', adminAuth, (req, res) => {
+// ── ADMIN: reset HWID ─────────────────────────────────────────
+app.post('/admin/hwid/reset', adminAuth, async (req, res) => {
   const { key } = req.body;
   if (!key) return res.status(400).json({ error: 'Key obrigatória' });
-  const found = db.prepare('SELECT * FROM ativadas WHERE key = ?').get(key);
+  const found = await db.get2('SELECT * FROM ativadas WHERE key = ?', [key]);
   if (!found) return res.status(404).json({ error: 'Key não encontrada' });
-  db.prepare('UPDATE ativadas SET hwid = NULL, mb = NULL, reset_at = ? WHERE key = ?')
-    .run(new Date().toISOString(), key);
+  await db.run2('UPDATE ativadas SET hwid = NULL, mb = NULL, reset_at = ? WHERE key = ?', [new Date().toISOString(), key]);
   res.json({ ok: true });
 });
 
-// Estender validade
-app.post('/admin/ativadas/:key/estender', adminAuth, (req, res) => {
+// ── ADMIN: estender validade ──────────────────────────────────
+app.post('/admin/ativadas/:key/estender', adminAuth, async (req, res) => {
   const { valor, unidade } = req.body;
-  const row = db.prepare('SELECT * FROM ativadas WHERE key = ?').get(req.params.key);
+  const row = await db.get2('SELECT * FROM ativadas WHERE key = ?', [req.params.key]);
   if (!row) return res.status(404).json({ error: 'Key não encontrada' });
-
   const d = new Date(row.expiracao);
   if      (unidade === 'horas')   d.setHours(d.getHours() + valor);
   else if (unidade === 'dias')    d.setDate(d.getDate() + valor);
   else if (unidade === 'semanas') d.setDate(d.getDate() + valor * 7);
   else if (unidade === 'meses')   d.setMonth(d.getMonth() + valor);
-
-  db.prepare('UPDATE ativadas SET expiracao = ? WHERE key = ?').run(d.toISOString(), row.key);
+  await db.run2('UPDATE ativadas SET expiracao = ? WHERE key = ?', [d.toISOString(), row.key]);
   res.json({ ok: true, expiracao: d.toISOString() });
 });
 
-// Stats
-app.get('/admin/stats', adminAuth, (req, res) => {
+// ── ADMIN: stats ──────────────────────────────────────────────
+app.get('/admin/stats', adminAuth, async (req, res) => {
   const tipos = ['diario', 'semanal', 'mensal', 'vitalicio'];
   const stats = {};
-  tipos.forEach(t => {
-    stats[t] = db.prepare('SELECT COUNT(*) as c FROM keys WHERE tipo = ? AND ativada = 0').get(t).c;
-  });
-  stats.ativadas = db.prepare('SELECT COUNT(*) as c FROM ativadas').get().c;
+  for (const t of tipos) {
+    const r = await db.get2('SELECT COUNT(*) as c FROM keys WHERE tipo = ? AND ativada = 0', [t]);
+    stats[t] = r.c;
+  }
+  const at = await db.get2('SELECT COUNT(*) as c FROM ativadas', []);
+  stats.ativadas  = at.c;
   stats.pendentes = tipos.reduce((s, t) => s + stats[t], 0);
   res.json(stats);
 });
 
-// ═══════════════════════════════════════════════════════════════
-// ROTA PÚBLICA — validar key (usado pelo seu app/script)
-// ═══════════════════════════════════════════════════════════════
-
-/*
-  POST /api/auth
-  Body: { key, hwid, mb? }
-
-  Respostas:
-    200 { valid: true,  tipo, expiracao }
-    200 { valid: false, reason }
-*/
-app.post('/api/auth', (req, res) => {
+// ── PÚBLICO: validar key ──────────────────────────────────────
+app.post('/api/auth', async (req, res) => {
   const { key, hwid, mb } = req.body;
   if (!key || !hwid) return res.status(400).json({ valid: false, reason: 'key e hwid obrigatórios' });
 
-  // Checar se a key existe nas pendentes
-  const pending = db.prepare('SELECT * FROM keys WHERE key = ? AND ativada = 0').get(key);
-
-  // Checar se já está ativada
-  const ativada = db.prepare('SELECT * FROM ativadas WHERE key = ?').get(key);
+  const ativada = await db.get2('SELECT * FROM ativadas WHERE key = ?', [key]);
 
   if (ativada) {
-    // Já ativada — checar HWID
-    if (ativada.hwid && ativada.hwid !== hwid) {
+    if (ativada.hwid && ativada.hwid !== hwid)
       return res.json({ valid: false, reason: 'HWID não corresponde' });
-    }
-
-    // Checar expiração
-    if (ativada.tipo !== 'vitalicio') {
-      if (new Date(ativada.expiracao) < new Date()) {
-        return res.json({ valid: false, reason: 'Key expirada' });
-      }
-    }
-
-    // Atualizar HWID se estava vazio (após reset)
-    if (!ativada.hwid) {
-      db.prepare('UPDATE ativadas SET hwid = ?, mb = ?, ip = ? WHERE key = ?')
-        .run(hwid, mb || null, getIP(req), key);
-    }
-
+    if (ativada.tipo !== 'vitalicio' && new Date(ativada.expiracao) < new Date())
+      return res.json({ valid: false, reason: 'Key expirada' });
+    if (!ativada.hwid)
+      await db.run2('UPDATE ativadas SET hwid = ?, mb = ?, ip = ? WHERE key = ?', [hwid, mb || null, getIP(req), key]);
     return res.json({ valid: true, tipo: ativada.tipo, expiracao: ativada.expiracao });
   }
 
-  if (!pending) {
-    return res.json({ valid: false, reason: 'Key inválida' });
-  }
+  const pending = await db.get2('SELECT * FROM keys WHERE key = ? AND ativada = 0', [key]);
+  if (!pending) return res.json({ valid: false, reason: 'Key inválida' });
 
-  // Primeira ativação
-  const expiracao = calcExpiracao(pending.tipo);
+  const expiracao = calcExp(pending.tipo);
   const ip = getIP(req);
-
-  db.prepare(`
-    INSERT INTO ativadas (key, tipo, hwid, mb, ip, expiracao, ativada_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(key, pending.tipo, hwid, mb || null, ip, expiracao.toISOString(), new Date().toISOString());
-
-  db.prepare('UPDATE keys SET ativada = 1 WHERE key = ?').run(key);
-
+  await db.run2(
+    'INSERT INTO ativadas (key, tipo, hwid, mb, ip, expiracao, ativada_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [key, pending.tipo, hwid, mb || null, ip, expiracao.toISOString(), new Date().toISOString()]
+  );
+  await db.run2('UPDATE keys SET ativada = 1 WHERE key = ?', [key]);
   res.json({ valid: true, tipo: pending.tipo, expiracao: expiracao.toISOString() });
 });
 
-// ─── Helpers ─────────────────────────────────────────────────
-function randStr(n) {
+// ── Helpers ───────────────────────────────────────────────────
+function rand(n) {
   const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: n }, () => c[Math.floor(Math.random() * c.length)]).join('');
 }
-
-function calcExpiracao(tipo) {
+function calcExp(tipo) {
   const d = new Date();
   if      (tipo === 'diario')   d.setDate(d.getDate() + 1);
   else if (tipo === 'semanal')  d.setDate(d.getDate() + 7);
@@ -195,10 +149,8 @@ function calcExpiracao(tipo) {
   else                          d.setFullYear(d.getFullYear() + 99);
   return d;
 }
-
 function getIP(req) {
   return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 }
 
-// ─── Start ────────────────────────────────────────────────────
 app.listen(PORT, () => console.log(`KeyAuth rodando na porta ${PORT}`));
