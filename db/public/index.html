@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciador de Licenças</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#0a0a0a;color:#e0e0e0;font-family:'Courier New',monospace;min-height:100vh;}
+  :root{
+    --accent:#e91e8c;--accent2:#ff4db8;
+    --border:#222;--surface:#111;--surface2:#161616;
+    --text:#e0e0e0;--muted:#555;
+    --green:#22c55e;--red:#ef4444;--yellow:#eab308;
+  }
+  .app{max-width:1400px;margin:0 auto;}
+  .header{background:#0d0d0d;border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;}
+  .header h1{font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#fff;}
+  .header p{font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:2px;}
+  .btn-disconnect{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 14px;font-size:10px;letter-spacing:2px;cursor:pointer;font-family:inherit;text-transform:uppercase;}
+  .btn-disconnect:hover{border-color:#ef4444;color:#ef4444;}
+  .nav{background:#0d0d0d;border-bottom:1px solid var(--border);display:flex;padding:0 24px;}
+  .nav-tab{padding:14px 20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;background:none;border-left:none;border-right:none;border-top:none;font-family:inherit;}
+  .nav-tab.active{color:#ff4db8;border-bottom-color:var(--accent);}
+  .nav-tab:hover:not(.active){color:#ccc;}
+  .page{display:none;padding:24px;}
+  .page.active{display:block;}
+  .stats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px;}
+  @media(max-width:900px){.stats-grid{grid-template-columns:repeat(3,1fr);}}
+  @media(max-width:500px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:16px;}
+  .stat-card .val{font-size:28px;font-weight:700;color:#fff;}
+  .stat-card .lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+  .gen-box{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:24px;}
+  .gen-box h3{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+  .gen-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field select,.field input{background:#0a0a0a;border:1px solid var(--border);color:#fff;padding:8px 12px;font-size:12px;font-family:inherit;border-radius:3px;outline:none;}
+  .field select:focus,.field input:focus{border-color:var(--accent);}
+  .btn-gen{background:#fff;color:#000;border:none;padding:9px 20px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:inherit;border-radius:3px;}
+  .btn-gen:hover{background:#e0e0e0;}
+  .btn-gen:disabled{opacity:.4;cursor:not-allowed;}
+  .keys-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media(max-width:900px){.keys-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:500px){.keys-grid{grid-template-columns:1fr;}}
+  .keys-panel{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:16px;}
+  .panel-header{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .panel-title{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fff;}
+  .badge{background:#1a1a1a;border:1px solid var(--border);padding:2px 8px;font-size:10px;color:var(--muted);border-radius:2px;}
+  .btn-copy,.btn-clear,.btn-del,.btn-info,.btn-extend{font-size:9px;padding:4px 8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;letter-spacing:1px;border-radius:2px;}
+  .btn-copy:hover{border-color:#22c55e;color:#22c55e;}
+  .btn-clear:hover,.btn-del:hover{border-color:#ef4444;color:#ef4444;}
+  .btn-info:hover{border-color:#e91e8c;color:#e91e8c;}
+  .btn-extend:hover{border-color:#eab308;color:#eab308;}
+  .panel-actions{display:flex;gap:4px;margin-left:auto;}
+  .key-list{min-height:60px;display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto;}
+  .key-item{background:#0d0d0d;border:1px solid var(--border);padding:8px 10px;font-size:9px;color:#aaa;font-family:'Courier New',monospace;border-radius:2px;word-break:break-all;}
+  .empty{color:var(--muted);font-size:10px;text-align:center;padding:16px;letter-spacing:1px;}
+  .hwid-box{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:24px;max-width:560px;}
+  .hwid-box h3{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+  .hwid-notice{background:#1a1400;border:1px solid #3a2e00;padding:10px 14px;font-size:11px;color:#eab308;border-radius:3px;margin-bottom:16px;}
+  .hwid-box input{width:100%;background:#0a0a0a;border:1px solid var(--border);color:#fff;padding:10px 14px;font-size:12px;font-family:inherit;border-radius:3px;outline:none;margin-bottom:12px;}
+  .hwid-box input:focus{border-color:var(--accent);}
+  .btn-reset-confirm{width:100%;background:#fff;color:#000;border:none;padding:10px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:inherit;border-radius:3px;}
+  .btn-reset-confirm:hover{background:#e0e0e0;}
+  .ativadas-box{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:20px;}
+  .ativadas-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .ativadas-header h3{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fff;}
+  .search-input{width:100%;background:#0a0a0a;border:1px solid var(--border);color:#fff;padding:10px 14px;font-size:12px;font-family:inherit;border-radius:3px;outline:none;margin-bottom:16px;}
+  .search-input:focus{border-color:var(--accent);}
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  thead th{text-align:left;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--border);}
+  tbody tr{border-bottom:1px solid #151515;}
+  tbody tr:hover{background:#0d0d0d;}
+  tbody td{padding:10px;color:#ccc;vertical-align:middle;}
+  td.key-val{font-family:'Courier New',monospace;font-size:10px;color:#aaa;}
+  .plan-badge{padding:2px 8px;border-radius:2px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+  .plan-diario{background:#0d1f12;color:#22c55e;border:1px solid #1a3d1f;}
+  .plan-semanal{background:#0d1520;color:#3b82f6;border:1px solid #1a2d40;}
+  .plan-mensal{background:#1a0010;color:#ff4db8;border:1px solid #4a0a2e;}
+  .plan-vitalicio{background:#201508;color:#eab308;border:1px solid #402a10;}
+  .status-active{color:#22c55e;font-size:9px;}
+  .status-expired{color:#ef4444;font-size:9px;}
+  .td-actions{display:flex;gap:4px;}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:#111;border:1px solid #333;border-radius:6px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+  .modal h2{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#fff;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+  .modal-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid #151515;gap:12px;}
+  .modal-row:last-child{border-bottom:none;}
+  .modal-row .k{font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;white-space:nowrap;}
+  .modal-row .v{font-size:11px;color:#ccc;font-family:'Courier New',monospace;text-align:right;word-break:break-all;}
+  .extend-row{display:flex;gap:8px;margin-top:16px;align-items:center;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .extend-row label{font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;white-space:nowrap;}
+  .extend-row input,.extend-row select{background:#0a0a0a;border:1px solid var(--border);color:#fff;padding:6px 10px;font-size:11px;font-family:inherit;border-radius:3px;outline:none;}
+  .extend-row input{width:70px;}
+  .btn-modal-extend{background:#eab308;color:#000;border:none;padding:7px 14px;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:inherit;border-radius:3px;}
+  .btn-modal-close{background:transparent;border:1px solid var(--border);color:var(--muted);padding:7px 14px;font-size:10px;cursor:pointer;font-family:inherit;border-radius:3px;margin-left:auto;}
+  .btn-modal-close:hover{border-color:#ef4444;color:#ef4444;}
+  .modal-footer{display:flex;gap:8px;margin-top:20px;}
+  .toast{position:fixed;bottom:24px;right:24px;background:#111;border:1px solid #333;padding:12px 20px;font-size:11px;color:#fff;border-radius:4px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:'Courier New',monospace;}
+  .toast.show{opacity:1;}
+  .toast.ok{border-color:#22c55e;color:#22c55e;}
+  .toast.err{border-color:#ef4444;color:#ef4444;}
+  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a0a;}
+  .login-card{background:#111;border:1px solid #222;border-radius:8px;padding:36px;width:380px;max-width:95vw;}
+  .login-card h2{font-size:18px;font-weight:700;color:#fff;text-align:center;margin-bottom:6px;}
+  .login-card .subtitle{font-size:11px;color:var(--muted);text-align:center;margin-bottom:28px;letter-spacing:1px;}
+  .login-card label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;}
+  .login-card input{width:100%;background:#0a0a0a;border:1px solid var(--border);color:#fff;padding:10px 14px;font-size:13px;font-family:inherit;border-radius:4px;outline:none;margin-bottom:16px;}
+  .login-card input:focus{border-color:#e91e8c;}
+  .btn-login{width:100%;background:var(--accent);color:#fff;border:none;padding:12px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:inherit;border-radius:4px;margin-top:4px;}
+  .btn-login:hover{background:#c4186f;}
+  .login-err{color:#ef4444;font-size:11px;text-align:center;margin-top:10px;min-height:16px;}
+  ::-webkit-scrollbar{width:4px;height:4px;}
+  ::-webkit-scrollbar-track{background:#111;}
+  ::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
+
+  /* endpoint box */
+  .endpoint-box{background:#0d0d0d;border:1px solid var(--border);border-radius:3px;padding:10px 14px;font-size:11px;color:#888;margin-top:20px;word-break:break-all;}
+  .endpoint-box span{color:var(--accent2);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h2>Painel Administrativo</h2>
+    <p class="subtitle">Gerenciador de Licenças</p>
+    <label>Usuário</label>
+    <input type="text" id="loginUser" placeholder="Digite seu usuário" autocomplete="username">
+    <label>Senha</label>
+    <input type="password" id="loginPass" placeholder="Digite sua senha" autocomplete="current-password">
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="mainApp" class="app" style="display:none">
+  <div class="header">
+    <div>
+      <h1>Gerenciador de Licenças</h1>
+      <p>Controle de acesso e reset de HWID</p>
+    </div>
+    <button class="btn-disconnect" onclick="doLogout()">Desconectar</button>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-tab active" onclick="switchTab('gerenciar')">Gerenciar Keys</button>
+    <button class="nav-tab" onclick="switchTab('hwid')">Resetar HWID</button>
+    <button class="nav-tab" onclick="switchTab('ativadas')">Keys Ativadas</button>
+    <button class="nav-tab" onclick="switchTab('api')">API</button>
+  </nav>
+
+  <!-- ABA: GERENCIAR KEYS -->
+  <div id="page-gerenciar" class="page active">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val" id="st-pendentes">0</div><div class="lbl">Pendentes</div></div>
+      <div class="stat-card"><div class="val" id="st-ativadas">0</div><div class="lbl">Ativadas</div></div>
+      <div class="stat-card"><div class="val" id="st-diario">0</div><div class="lbl">Diário</div></div>
+      <div class="stat-card"><div class="val" id="st-semanal">0</div><div class="lbl">Semanal</div></div>
+      <div class="stat-card"><div class="val" id="st-mensal">0</div><div class="lbl">Mensal</div></div>
+      <div class="stat-card"><div class="val" id="st-vitalicio">0</div><div class="lbl">Vitalício</div></div>
+    </div>
+
+    <div class="gen-box">
+      <h3>Gerar Novas Licenças</h3>
+      <div class="gen-row">
+        <div class="field">
+          <label>Tipo de Assinatura</label>
+          <select id="genTipo">
+            <option value="diario">Diário</option>
+            <option value="semanal">Semanal</option>
+            <option value="mensal">Mensal</option>
+            <option value="vitalicio">Vitalício</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Prefixo</label>
+          <input type="text" id="genPrefixo" value="Key" style="width:110px">
+        </div>
+        <div class="field">
+          <label>Quantidade</label>
+          <input type="number" id="genQtd" value="1" min="1" max="100" style="width:80px">
+        </div>
+        <button class="btn-gen" id="btnGerar" onclick="gerarKeys()">Gerar Agora</button>
+      </div>
+    </div>
+
+    <div class="keys-grid">
+      <div class="keys-panel">
+        <div class="panel-header">
+          <span class="panel-title">Diário</span>
+          <span class="badge" id="cnt-diario">0</span>
+          <div class="panel-actions">
+            <button class="btn-copy" onclick="copiarKeys('diario')">Copiar</button>
+            <button class="btn-clear" onclick="limparKeys('diario')">Limpar</button>
+          </div>
+        </div>
+        <div class="key-list" id="list-diario"><div class="empty">Nenhuma key</div></div>
+      </div>
+      <div class="keys-panel">
+        <div class="panel-header">
+          <span class="panel-title">Semanal</span>
+          <span class="badge" id="cnt-semanal">0</span>
+          <div class="panel-actions">
+            <button class="btn-copy" onclick="copiarKeys('semanal')">Copiar</button>
+            <button class="btn-clear" onclick="limparKeys('semanal')">Limpar</button>
+          </div>
+        </div>
+        <div class="key-list" id="list-semanal"><div class="empty">Nenhuma key</div></div>
+      </div>
+      <div class="keys-panel">
+        <div class="panel-header">
+          <span class="panel-title">Mensal</span>
+          <span class="badge" id="cnt-mensal">0</span>
+          <div class="panel-actions">
+            <button class="btn-copy" onclick="copiarKeys('mensal')">Copiar</button>
+            <button class="btn-clear" onclick="limparKeys('mensal')">Limpar</button>
+          </div>
+        </div>
+        <div class="key-list" id="list-mensal"><div class="empty">Nenhuma key</div></div>
+      </div>
+      <div class="keys-panel">
+        <div class="panel-header">
+          <span class="panel-title">Vitalício</span>
+          <span class="badge" id="cnt-vitalicio">0</span>
+          <div class="panel-actions">
+            <button class="btn-copy" onclick="copiarKeys('vitalicio')">Copiar</button>
+            <button class="btn-clear" onclick="limparKeys('vitalicio')">Limpar</button>
+          </div>
+        </div>
+        <div class="key-list" id="list-vitalicio"><div class="empty">Nenhuma key</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA: RESETAR HWID -->
+  <div id="page-hwid" class="page">
+    <div class="hwid-box">
+      <h3>Resetar HWID</h3>
+      <p style="font-size:12px;color:#888;margin-bottom:16px;line-height:1.7;">
+        Utilize esta função para liberar o acesso de um usuário em um novo computador.
+      </p>
+      <div class="hwid-notice">A key continuará ativa normalmente após o reset.</div>
+      <label style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;margin-top:16px;">Key do Usuário</label>
+      <input type="text" id="hwidKey" placeholder="Cole a key aqui...">
+      <button class="btn-reset-confirm" onclick="resetarHwid()">Confirmar Reset</button>
+    </div>
+  </div>
+
+  <!-- ABA: KEYS ATIVADAS -->
+  <div id="page-ativadas" class="page">
+    <div class="ativadas-box">
+      <div class="ativadas-header">
+        <h3>Keys Ativadas</h3>
+        <span style="font-size:10px;color:var(--muted)" id="total-ativadas">0 total</span>
+      </div>
+      <input type="text" class="search-input" id="searchInput" placeholder="Pesquisar key, HWID ou IP..." oninput="buscarAtivadas()">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Key</th><th>Plano</th><th>HWID</th><th>Expiração</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="ativadas-tbody"></tbody>
+        </table>
+        <div id="ativadas-empty" class="empty" style="padding:32px;">Nenhuma key ativada</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA: API -->
+  <div id="page-api" class="page">
+    <div class="hwid-box" style="max-width:700px">
+      <h3>Endpoint de Validação</h3>
+      <p style="font-size:12px;color:#888;line-height:1.8;margin-bottom:16px;">
+        Use esta rota no seu app/script para validar keys dos seus usuários.
+      </p>
+      <div class="endpoint-box">
+        <span>POST</span> <span id="apiUrl">/api/auth</span>
+      </div>
+      <p style="font-size:11px;color:#666;margin-top:16px;margin-bottom:8px;letter-spacing:1px;">BODY (JSON):</p>
+      <div class="endpoint-box" style="white-space:pre;line-height:1.8">{
+  "key":  "Key-XXXXX-XXXXX-XXXXX-XXXXX",
+  "hwid": "identificador-unico-do-pc",
+  "mb":   "fabricante-placa-mae"  <span style="color:#444">// opcional</span>
+}</div>
+      <p style="font-size:11px;color:#666;margin-top:16px;margin-bottom:8px;letter-spacing:1px;">RESPOSTA (sucesso):</p>
+      <div class="endpoint-box" style="white-space:pre;line-height:1.8">{ "valid": <span>true</span>,  "tipo": "mensal", "expiracao": "2025-07-06T..." }
+{ "valid": <span style="color:#ef4444">false</span>, "reason": "Key expirada" }</div>
+      <p style="font-size:11px;color:#666;margin-top:16px;margin-bottom:8px;letter-spacing:1px;">EXEMPLO (Python):</p>
+      <div class="endpoint-box" style="white-space:pre;line-height:1.8;font-size:10px">import requests, uuid, platform
+
+res = requests.post("<span id="apiUrlPy">/api/auth</span>", json={
+    "key":  input("Cole sua key: "),
+    "hwid": str(uuid.getnode()),
+    "mb":   platform.node()
+})
+data = res.json()
+if data["valid"]:
+    print("Acesso liberado!", data["tipo"])
+else:
+    print("Acesso negado:", data["reason"])</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INFO -->
+<div class="modal-overlay" id="modalInfo">
+  <div class="modal">
+    <h2>Informações da Key</h2>
+    <div id="modal-content"></div>
+    <div class="extend-row">
+      <label>Estender:</label>
+      <input type="number" id="extendVal" value="1" min="1">
+      <select id="extendUnit">
+        <option value="horas">Horas</option>
+        <option value="dias" selected>Dias</option>
+        <option value="semanas">Semanas</option>
+        <option value="meses">Meses</option>
+      </select>
+      <button class="btn-modal-extend" onclick="estenderKey()">Aplicar</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-close" onclick="fecharModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let TOKEN = '';
+  let currentModalKey = null;
+  let ativadasCache = [];
+
+  // ── API base URL (mesmo domínio em produção) ──────────────────
+  const BASE = window.location.origin;
+
+  async function api(method, path, body) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(BASE + path, opts);
+    return r.json();
+  }
+
+  // ── LOGIN ────────────────────────────────────────────────────
+  const ADMIN_USER = 'admin';
+  const ADMIN_PASS = 'admin123';
+
+  async function doLogin() {
+    const user = document.getElementById('loginUser').value.trim();
+    const pass = document.getElementById('loginPass').value.trim();
+    if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
+      document.getElementById('loginErr').textContent = 'Usuário ou senha inválidos.';
+      return;
+    }
+    TOKEN = ADMIN_PASS;
+    const data = await api('GET', '/admin/stats').catch(() => null);
+    if (!data || data.error) {
+      document.getElementById('loginErr').textContent = 'Usuário ou senha inválidos.';
+      TOKEN = '';
+      return;
+    }
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('apiUrl').textContent   = BASE + '/api/auth';
+    document.getElementById('apiUrlPy').textContent = BASE + '/api/auth';
+    atualizarStats(data);
+    carregarKeys();
+  }
+
+  function doLogout() {
+    TOKEN = '';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginUser').value = '';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginErr').textContent = '';
+  }
+
+  document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('loginUser').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
+
+  // ── NAVEGAÇÃO ────────────────────────────────────────────────
+  function switchTab(t) {
+    const tabs = ['gerenciar', 'hwid', 'ativadas', 'api'];
+    document.querySelectorAll('.nav-tab').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + t).classList.add('active');
+    if (t === 'ativadas') buscarAtivadas();
+    if (t === 'gerenciar') carregarKeys();
+  }
+
+  // ── STATS ────────────────────────────────────────────────────
+  function atualizarStats(s) {
+    ['pendentes','ativadas','diario','semanal','mensal','vitalicio'].forEach(k => {
+      const el = document.getElementById('st-' + k);
+      if (el) el.textContent = s[k] ?? 0;
+    });
+  }
+
+  async function recarregarStats() {
+    const s = await api('GET', '/admin/stats');
+    if (s && !s.error) atualizarStats(s);
+  }
+
+  // ── KEYS PENDENTES ───────────────────────────────────────────
+  async function carregarKeys() {
+    const keys = await api('GET', '/admin/keys');
+    if (!keys || keys.error) return;
+    const grouped = { diario: [], semanal: [], mensal: [], vitalicio: [] };
+    keys.forEach(k => grouped[k.tipo] && grouped[k.tipo].push(k.key));
+    ['diario','semanal','mensal','vitalicio'].forEach(t => renderPanel(t, grouped[t]));
+    recarregarStats();
+  }
+
+  function renderPanel(t, lista) {
+    const listEl = document.getElementById('list-' + t);
+    const cntEl  = document.getElementById('cnt-' + t);
+    cntEl.textContent = lista.length;
+    if (!lista.length) { listEl.innerHTML = '<div class="empty">Nenhuma key</div>'; return; }
+    listEl.innerHTML = lista.map(key => `
+      <div class="key-item" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span style="flex:1;word-break:break-all;">${key}</span>
+        <button class="btn-del" onclick="deletarKey('${key}')">✕</button>
+      </div>`).join('');
+  }
+
+  async function gerarKeys() {
+    const btn = document.getElementById('btnGerar');
+    btn.disabled = true; btn.textContent = 'Gerando...';
+    const res = await api('POST', '/admin/keys/gerar', {
+      tipo:      document.getElementById('genTipo').value,
+      prefixo:   document.getElementById('genPrefixo').value.trim() || 'Key',
+      quantidade: parseInt(document.getElementById('genQtd').value) || 1
+    });
+    btn.disabled = false; btn.textContent = 'Gerar Agora';
+    if (res.geradas) {
+      showToast(`${res.geradas.length} key(s) gerada(s)!`, 'ok');
+      carregarKeys();
+    } else showToast('Erro ao gerar keys.', 'err');
+  }
+
+  async function deletarKey(key) {
+    await api('DELETE', '/admin/keys/' + encodeURIComponent(key));
+    carregarKeys();
+    showToast('Key removida.', 'err');
+  }
+
+  async function limparKeys(tipo) {
+    await api('DELETE', '/admin/keys/tipo/' + tipo);
+    carregarKeys();
+    showToast(`Lista ${tipo} limpa.`, 'err');
+  }
+
+  async function copiarKeys(tipo) {
+    const keys = await api('GET', '/admin/keys');
+    const filtradas = (keys || []).filter(k => k.tipo === tipo).map(k => k.key);
+    if (!filtradas.length) { showToast('Nenhuma key para copiar.', 'err'); return; }
+    navigator.clipboard.writeText(filtradas.join('\n')).then(() => showToast('Keys copiadas!', 'ok'));
+  }
+
+  // ── KEYS ATIVADAS ────────────────────────────────────────────
+  async function buscarAtivadas() {
+    const q = document.getElementById('searchInput').value;
+    const lista = await api('GET', '/admin/ativadas?q=' + encodeURIComponent(q));
+    if (!lista || lista.error) return;
+    ativadasCache = lista;
+    document.getElementById('total-ativadas').textContent = `${lista.length} total`;
+    const tbody = document.getElementById('ativadas-tbody');
+    const empty = document.getElementById('ativadas-empty');
+    if (!lista.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    const now = new Date();
+    tbody.innerHTML = lista.map(a => {
+      const exp   = new Date(a.expiracao);
+      const ativo = exp > now || a.tipo === 'vitalicio';
+      const expStr = a.tipo === 'vitalicio'
+        ? 'Vitalício'
+        : exp.toLocaleDateString('pt-BR') + ' ' + exp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      return `<tr>
+        <td class="key-val">${a.key}</td>
+        <td><span class="plan-badge plan-${a.tipo}">${a.tipo}</span></td>
+        <td style="font-family:monospace;font-size:10px;color:#888;">${a.hwid || '-'}</td>
+        <td>
+          <span class="${ativo ? 'status-active' : 'status-expired'}">${ativo ? '●' : '○'}</span>
+          ${expStr}
+        </td>
+        <td>
+          <div class="td-actions">
+            <button class="btn-info" onclick="abrirInfo('${a.key}')">Info</button>
+            <button class="btn-del"  onclick="deletarAtivada('${a.key}')">✕</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function deletarAtivada(key) {
+    await api('DELETE', '/admin/ativadas/' + encodeURIComponent(key));
+    buscarAtivadas();
+    recarregarStats();
+    showToast('Key removida.', 'err');
+  }
+
+  // ── HWID RESET ───────────────────────────────────────────────
+  async function resetarHwid() {
+    const key = document.getElementById('hwidKey').value.trim();
+    if (!key) { showToast('Cole uma key válida.', 'err'); return; }
+    const res = await api('POST', '/admin/hwid/reset', { key });
+    if (res.ok) {
+      document.getElementById('hwidKey').value = '';
+      showToast('HWID resetado com sucesso!', 'ok');
+    } else showToast(res.error || 'Key não encontrada.', 'err');
+  }
+
+  // ── MODAL INFO ───────────────────────────────────────────────
+  function abrirInfo(key) {
+    const a = ativadasCache.find(x => x.key === key);
+    if (!a) return;
+    currentModalKey = key;
+    const exp   = new Date(a.expiracao);
+    const now   = new Date();
+    const ativo = exp > now || a.tipo === 'vitalicio';
+    const diffMs = exp - now;
+    const diffH  = Math.max(0, Math.floor(diffMs / 3600000));
+    const diffD  = Math.floor(diffH / 24);
+    const restante = a.tipo === 'vitalicio' ? 'Vitalício' : `${diffD}d ${diffH % 24}h restantes`;
+    document.getElementById('modal-content').innerHTML = `
+      <div class="modal-row"><span class="k">Key</span><span class="v">${a.key}</span></div>
+      <div class="modal-row"><span class="k">Plano</span><span class="v">${a.tipo}</span></div>
+      <div class="modal-row"><span class="k">Status</span><span class="v" style="color:${ativo ? '#22c55e' : '#ef4444'}">${ativo ? 'Ativa' : 'Expirada'}</span></div>
+      <div class="modal-row"><span class="k">Expiração</span><span class="v">${a.tipo === 'vitalicio' ? '—' : exp.toLocaleString('pt-BR')}</span></div>
+      <div class="modal-row"><span class="k">Tempo Restante</span><span class="v">${restante}</span></div>
+      <div class="modal-row"><span class="k">IP de Ativação</span><span class="v">${a.ip || '—'}</span></div>
+      <div class="modal-row"><span class="k">HWID</span><span class="v" style="font-size:9px">${a.hwid || '—'}</span></div>
+      <div class="modal-row"><span class="k">ID Placa-Mãe</span><span class="v">${a.mb || '—'}</span></div>
+      <div class="modal-row"><span class="k">Data Ativação</span><span class="v">${a.ativada_em ? new Date(a.ativada_em).toLocaleString('pt-BR') : '—'}</span></div>
+      <div class="modal-row"><span class="k">Último Reset HWID</span><span class="v">${a.reset_at ? new Date(a.reset_at).toLocaleString('pt-BR') : 'Nunca'}</span></div>
+    `;
+    document.getElementById('modalInfo').classList.add('open');
+  }
+
+  function fecharModal() { document.getElementById('modalInfo').classList.remove('open'); }
+
+  async function estenderKey() {
+    const res = await api('POST', `/admin/ativadas/${encodeURIComponent(currentModalKey)}/estender`, {
+      valor:   parseInt(document.getElementById('extendVal').value) || 1,
+      unidade: document.getElementById('extendUnit').value
+    });
+    if (res.ok) {
+      // atualiza cache local
+      const a = ativadasCache.find(x => x.key === currentModalKey);
+      if (a) a.expiracao = res.expiracao;
+      abrirInfo(currentModalKey);
+      showToast('Key estendida!', 'ok');
+    } else showToast('Erro ao estender.', 'err');
+  }
+
+  document.getElementById('modalInfo').addEventListener('click', function(e) {
+    if (e.target === this) fecharModal();
+  });
+
+  // ── TOAST ────────────────────────────────────────────────────
+  function showToast(msg, type = 'ok') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (type === 'ok' ? 'ok' : 'err');
+    setTimeout(() => t.classList.remove('show'), 2600);
+  }
+</script>
+</body>
+</html>
