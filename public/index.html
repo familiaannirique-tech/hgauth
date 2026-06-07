@@ -134,11 +134,40 @@
   .login-btn{width:100%;background:#fff;color:#000;border:none;padding:13px;font-size:12px;font-weight:900;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:'Courier New',monospace;border-radius:6px;margin-top:8px;}
   .login-btn:hover{background:#e0e0e0;}
   .login-err{color:#ef4444;font-size:11px;text-align:center;margin-top:12px;min-height:16px;}
+
+  .login-overlay{position:fixed;inset:0;background:#000;z-index:9999;display:flex;align-items:center;justify-content:center;}
+  .login-overlay.hidden{display:none;}
+  .login-card{background:#0d0d0d;border:1px solid #222;border-radius:12px;padding:44px 40px;width:420px;max-width:95vw;}
+  .login-logo{font-size:22px;font-weight:900;letter-spacing:6px;text-transform:uppercase;color:#fff;text-align:center;margin-bottom:6px;}
+  .login-sub{font-size:10px;letter-spacing:2px;color:#444;text-align:center;margin-bottom:36px;text-transform:uppercase;}
+  .login-field{width:100%;margin-bottom:14px;}
+  .login-field label{display:block;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#555;margin-bottom:7px;}
+  .login-field input{width:100%;background:#060606;border:1px solid #1a1a1a;color:#fff;padding:12px 16px;font-size:13px;font-family:'Courier New',monospace;border-radius:6px;outline:none;}
+  .login-field input:focus{border-color:#e91e8c;}
+  .login-btn{width:100%;background:#fff;color:#000;border:none;padding:13px;font-size:12px;font-weight:900;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:'Courier New',monospace;border-radius:6px;margin-top:8px;}
+  .login-btn:hover{background:#e0e0e0;}
+  .login-err{color:#ef4444;font-size:11px;text-align:center;margin-top:12px;min-height:16px;}
 </style>
 </head>
 <body>
 
 <!-- APP -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">ZIKA AUTH</div>
+    <div class="login-sub">Gerenciador de Licencas</div>
+    <div class="login-field">
+      <label>Usuario</label>
+      <input type="text" id="loginUser" placeholder="Digite seu usuario">
+    </div>
+    <div class="login-field">
+      <label>Senha</label>
+      <input type="password" id="loginPass" placeholder="Digite sua senha">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
 <div id="mainApp" class="app">
   <div class="header">
     <div>
@@ -550,24 +579,37 @@ else:
     setTimeout(() => t.classList.remove('show'), 2600);
   }
 
-  // ── LOGIN ────────────────────────────────────────────────────
-  (function() {
-    var U = 'astrohgkeys', P = 'adminhg';
-    window.doLogin = function() {
-      var u = document.getElementById('loginUser').value.trim().toLowerCase();
-      var p = document.getElementById('loginPass').value.trim();
-      if (u === U && p === P) {
-        document.getElementById('loginOverlay').classList.add('hidden');
-      } else {
-        document.getElementById('loginErr').textContent = 'Usuário ou senha inválidos.';
-      }
-    };
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !document.getElementById('loginOverlay').classList.contains('hidden')) {
-        window.doLogin();
-      }
-    });
-  })();
+  var _U = 'astrohgkeys', _P = 'adminhg';
+  function doLogin() {
+    var u = (document.getElementById('loginUser').value || '').trim().toLowerCase();
+    var p = (document.getElementById('loginPass').value || '').trim();
+    if (u === _U && p === _P) {
+      document.getElementById('loginOverlay').classList.add('hidden');
+    } else {
+      document.getElementById('loginErr').textContent = 'Usuário ou senha inválidos.';
+    }
+  }
+  document.addEventListener('keydown', function(e) {
+    var ov = document.getElementById('loginOverlay');
+    if (e.key === 'Enter' && ov && !ov.classList.contains('hidden')) doLogin();
+  });
+
+
+  var _U = 'astrohgkeys', _P = 'adminhg';
+  function doLogin() {
+    var u = (document.getElementById('loginUser').value || '').trim().toLowerCase();
+    var p = (document.getElementById('loginPass').value || '').trim();
+    if (u === _U && p === _P) {
+      document.getElementById('loginOverlay').classList.add('hidden');
+    } else {
+      document.getElementById('loginErr').textContent = 'Usuario ou senha invalidos.';
+    }
+  }
+  document.addEventListener('keydown', function(e) {
+    var ov = document.getElementById('loginOverlay');
+    if (e.key === 'Enter' && ov && !ov.classList.contains('hidden')) doLogin();
+  });
+
 </script>
 </body>
 </html>
